@@ -24,6 +24,8 @@ parser.add_argument("-a", "--match-all", action="store_true", help = "By default
 parser.add_argument("-l", "--level", action="store", help = "Descend only level directories deep", type = int)
 parser.add_argument("-i", "--ignore-case", action="store_true", help = "Enables case insensitive keyword search.")
 parser.add_argument("-v", "--verbose", action="store_true", help = "Print information about which keyword(s) matched.")
+parser.add_argument("-f", "--full-paths", action="store_true", help = "Print absolute file paths.")
+parser.add_argument("-n", "--non-ascii", action="store_true", help = "Draw the directories tree using utf-8 characters (use this in case of \"UnicodeEncodeError: 'ascii' codec...\" along with -q).")
 parser.add_argument("-q", "--quiet", action="store_true", help = "Do not print the banner on startup.")
 
 args = parser.parse_args()
@@ -35,7 +37,7 @@ def exit_with_msg(msg):
 	
 
 # Init keywords list
-default_keywords = ['passw', 'admin', 'token', 'user', 'secret']
+default_keywords = ['passw', 'admin', 'token', 'user', 'secret', 'login']
 keywords = []
 
 if not args.keywords:
@@ -135,8 +137,13 @@ def file_inspector(file_path):
 
 
 
+child = '├─── ' if not args.non_ascii else '|--- '
+child_last = '└─── ' if not args.non_ascii else '|--- '
+parent = '│      ' if not args.non_ascii else '|      '
+
+
 def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
-	# ~ print(F'{GREEN}{root_dir}{END}')
+
 	try:
 		root_dirs = next(os.walk(root_dir))[1]
 		root_files = next(os.walk(root_dir))[2]
@@ -154,16 +161,18 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				color = details
 				verbose = ''
 			
+			filename = root_files[i] if not args.full_pathnames else root_dir + root_files[i]
+			
 			if not args.only_interesting:
-				print(f'{depth}├─── {color}{root_files[i]}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}└─── {color}{root_files[i]}{END}{verbose}')
+				print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
 				
 			elif args.only_interesting and color:
-				print(f'{depth}├─── {color}{root_files[i]}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}└─── {color}{root_files[i]}{END}{verbose}')
+				print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
 
 
 		for i in range(0, total_dirs):
 			
-			print(f'{depth}├─── {DIR}{root_dirs[i]}{END}') if i < total_dirs - 1 else print(f'{depth}└─── {DIR}{root_dirs[i]}{END}')
+			print(f'{depth}{child}{DIR}{root_dirs[i]}{END}') if i < total_dirs - 1 else print(f'{depth}{child_last}{DIR}{root_dirs[i]}{END}')
 			joined_path = root_dir + root_dirs[i] + os.sep
 			sub_dirs = next(os.walk(joined_path))[1]
 			sub_files = next(os.walk(joined_path))[2]
@@ -171,7 +180,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 			
 			if (len(sub_dirs) or len(sub_files)) and (intent + 1) < depth_level:
 				tmp = depth
-				depth = depth + '│      ' if i < (total_dirs - 1) else depth + '       '
+				depth = depth + parent if i < (total_dirs - 1) else depth + '      '
 				eviltree(joined_path, intent + 1, depth)
 				depth = tmp
 		
@@ -201,5 +210,3 @@ def main():
 
 if __name__ == '__main__':
 	main()
-
-
