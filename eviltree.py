@@ -14,7 +14,6 @@ RED = '\033[1;31m'
 END = '\033[0m'
 
 
-
 # -------------- Arguments & Usage -------------- #
 parser = argparse.ArgumentParser(
 	formatter_class=argparse.RawTextHelpFormatter,
@@ -30,6 +29,7 @@ parser.add_argument("-o", "--only-interesting", action="store_true", help = "Lis
 parser.add_argument("-k", "--keywords", action="store", help = "Comma separated keywords to search for in files.")
 parser.add_argument("-a", "--match-all", action="store_true", help = "By default, files are marked when at least one keyword is matched. Use this option to mark only files that match all given keywords.")
 parser.add_argument("-l", "--level", action="store", help = "Descend only level directories deep", type = int)
+parser.add_argument("-i", "--ignore-case", action="store_true", help = "Enables case insensitive keyword search.")
 parser.add_argument("-v", "--verbose", action="store_true", help = "Print information about which keyword(s) matched.")
 parser.add_argument("-q", "--quiet", action="store_true", help = "Do not print the banner on startup.")
 
@@ -106,6 +106,7 @@ def print_banner():
 	print(f'{END}{padding}                   by t3l3machus\n')
 
 
+
 def chill():
 	pass
 		
@@ -120,12 +121,13 @@ def file_inspector(file_path):
 			matched = []
 			
 			for w in keywords:
-				if re.search(w, content):
+				found = re.search(w, content) if args.ignore_case else re.search(w, content, re.IGNORECASE)
+				if found:
 					matched.append(w)
 					
 					if not args.match_all and not args.verbose:
 						return MATCH
-			
+		
 			if not args.match_all and len(matched):
 				return [MATCH, f" {GREEN}[{', '.join(matched)}]{END}"]
 			
@@ -140,7 +142,7 @@ def file_inspector(file_path):
 
 
 def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
-			
+	# ~ print(F'{GREEN}{root_dir}{END}')
 	try:
 		root_dirs = next(os.walk(root_dir))[1]
 		root_files = next(os.walk(root_dir))[2]
@@ -170,9 +172,10 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 			print(f'{depth}├─── {DIR}{root_dirs[i]}{END}') if i < total_dirs - 1 else print(f'{depth}└─── {DIR}{root_dirs[i]}{END}')
 			joined_path = root_dir + root_dirs[i] + os.sep
 			sub_dirs = next(os.walk(joined_path))[1]
+			sub_files = next(os.walk(joined_path))[2]
 			
 			
-			if len(sub_dirs) and (intent + 1) < depth_level:
+			if (len(sub_dirs) or len(sub_files)) and (intent + 1) < depth_level:
 				tmp = depth
 				depth = depth + '│      ' if i < (total_dirs - 1) else depth + '       '
 				eviltree(joined_path, intent + 1, depth)
@@ -189,9 +192,15 @@ def main():
 	print_banner() if not args.quiet else chill()
 
 	root_dir = args.root_path if args.root_path[-1] == os.sep else args.root_path + os.sep
-	print(f'\r{DIR}{root_dir}{END}')
 	
-	eviltree(root_dir)
+	
+	if os.path.exists(root_dir):
+		print(f'\r{DIR}{root_dir}{END}')
+		eviltree(root_dir)
+		
+	else:
+		exit_with_msg('Directory does not exist.')
+		
 	print('\r')
 
 
