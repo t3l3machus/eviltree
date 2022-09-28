@@ -15,14 +15,7 @@ END = '\033[0m'
 
 
 # -------------- Arguments & Usage -------------- #
-parser = argparse.ArgumentParser(
-	formatter_class=argparse.RawTextHelpFormatter,
-	epilog='''
-	
-Usage examples:
-
-'''
-)
+parser = argparse.ArgumentParser()
 
 parser.add_argument("-r", "--root-path", action="store", help = "The root path to walk.", required = True)
 parser.add_argument("-o", "--only-interesting", action="store_true", help = "List only those files that their content includes interesting keywords.")
@@ -121,7 +114,8 @@ def file_inspector(file_path):
 			matched = []
 			
 			for w in keywords:
-				found = re.search(w, content) if args.ignore_case else re.search(w, content, re.IGNORECASE)
+				found = re.search(w, content, re.IGNORECASE) if args.ignore_case else re.search(w, content)
+				
 				if found:
 					matched.append(w)
 					
