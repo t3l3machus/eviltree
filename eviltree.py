@@ -3,11 +3,14 @@
 # Written by Panagiotis Chartas (t3l3machus)
 
 import os, re, argparse
+from stat import S_ISCHR, ST_MODE, S_ISBLK
 from sys import exit
+
 
 ''' Colors '''
 LINK = '\033[1;38;5;37m'
 BROKEN = '\033[48;5;234m\033[1;31m'
+CHARSPEC = '\033[0;38;5;228m'
 DEBUG = '\033[0;38;5;214m'
 GREEN = '\033[38;5;47m'
 DIR = '\033[1;38;5;12m'
@@ -121,48 +124,52 @@ def chill():
 		
 	
 def file_inspector(file_path, mode = 0):
-	
-	# Regular mode, search binary and non-binary, case insensitive for non-binary files
-	if mode == 0:	
+	try:
+		# Regular mode, search binary and non-binary, case insensitive for non-binary files
+		if mode == 0:	
+					
+			try:
+				_file = open(file_path, 'r')
+				content = _file.read()
+				binary = False
+			
+			except UnicodeDecodeError:
+				_file = open(file_path, 'rb')
+				content = _file.read()		
+				binary = True
+			
+			except:
+				#print(f'{GREEN}failed to read{file_path}{END}')
+				return RED
 				
-		try:
-			_file = open(file_path, 'r')
-			content = _file.read()
-			binary = False
-		
-		except UnicodeDecodeError:
-			_file = open(file_path, 'rb')
-			content = _file.read()		
-			binary = True
-	
-		matched = []
-			
-		for w in keywords:
-			w = re.escape(w)
-			#w = '[\s\S]{0,3}' + w + '[\s\S]{0,3}'
-			regex = re.compile(bytes(w.encode('utf-8'))) if binary else w
-			
-			if binary:
-				found = re.search(regex, content)
-			else:
-				found = re.search(regex, content, re.I) if args.ignore_case else re.search(regex, content)
-			
-			if found:
-				matched.append(w)
+			matched = []
 				
-				if not args.match_all and not args.verbose:
-					return MATCH
+			for w in keywords:
+				w = re.escape(w)
+				#w = '[\s\S]{0,3}' + w + '[\s\S]{0,3}'
+				regex = re.compile(bytes(w.encode('utf-8'))) if binary else w
+				
+				if binary:
+					found = re.search(regex, content)
+				else:
+					found = re.search(regex, content, re.I) if args.ignore_case else re.search(regex, content)
+				
+				if found:
+					matched.append(w)
+					
+					if not args.match_all and not args.verbose:
+						return MATCH
 
-		if not args.match_all and len(matched):
-			return [MATCH, f" {GREEN}[{', '.join(matched)}]{END}"]
-		
-		if args.match_all and len(matched) == total_keywords:
-			return MATCH if not args.verbose else [MATCH, f" {GREEN}[{', '.join(keywords)}]{END}"]
+			if not args.match_all and len(matched):
+				return [MATCH, f" {GREEN}[{', '.join(matched)}]{END}"]
 			
-		return ''
+			if args.match_all and len(matched) == total_keywords:
+				return MATCH if not args.verbose else [MATCH, f" {GREEN}[{', '.join(keywords)}]{END}"]
+				
+			return ''
 		
-#	except UnicodeDecodeError:
-#		return RED	
+	except UnicodeDecodeError:
+		return RED	
 
 
 
@@ -170,24 +177,28 @@ def fake2realpath(root_dir, target):
 	
 	back_count = target.count(".." + os.sep)
 	
-	if (re.search("\.\." + os.sep, target)) and (back_count == (root_dir.count(os.sep) - 1)):
+	if (re.search("\.\." + os.sep, target)) and (back_count <= (root_dir.count(os.sep) - 1)):
 		dirlist = [d for d in root_dir.split(os.sep) if d.strip()]
 		dirlist.insert(0, os.sep)
-		
+
 		try:
 			realpath = ''
-			
-			for i in range(0, back_count - 1):
-				realpath += dirlist[i]
-			
+
+			for i in range(0, len(dirlist) - back_count ):
+				realpath = realpath + (dirlist[i] + os.sep) if dirlist[i] != "/" else dirlist[i]
+
 			realpath += target.split(".." + os.sep)[-1]
 			return realpath
 			
 		except:
 			return None
 	
-	elif not re.search(os.sep, target):
+	elif not re.search(os.sep, target): # there a case missing here --> testdir/
 		return root_dir + target
+
+
+	elif re.search("\." + os.sep, target) and not re.search("\.\." + os.sep, target):
+		return root_dir + (target.replace("./", ""))
 	
 	else:
 		return target
@@ -203,110 +214,138 @@ total_files_processed = 0
 
 def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 
-	# ~ try:
-	root_dirs = next(os.walk(root_dir))[1]
-	root_files = next(os.walk(root_dir))[2]
-	total_dirs = len(root_dirs)
-	total_files = len(root_files)
-	symlinks = []
-	recursive = []
-	global total_dirs_processed, total_files_processed
-	# ~ total_dirs_processed += 1
-	
-
-
-	# Handle symlinks
-	for d in root_dirs:
-		if os.path.islink(f'{root_dir}{d}'):
-			symlinks.append(d)
-	
-	
-	# Process files
-	root_files.sort()
-	
-	if not args.directories_only:
+	try:
+		global total_dirs_processed, total_files_processed
 		
-		for i in range(0, total_files):
-			total_files_processed += 1
-			file_path = f'{root_dir}{root_files[i]}'
-			is_link = True if os.path.islink(file_path) else False
-			target = os.readlink(file_path) if is_link else None
+		root_dirs = next(os.walk(root_dir))[1]
+		root_files = next(os.walk(root_dir))[2]
+		total_dirs = len(root_dirs)
+		total_files = len(root_files)
+		symlinks = []
+		recursive = []
+		
 
-			# Verify target path if file is a symlink 
-			if target:
-				#target = (root_dir[0:-1] + target) if (re.search("\.\." + os.sep, target)) and (target.count(".." + os.sep) == (root_dir.count(os.sep) - 1)) else target # for symlink targets that include ../ in their path
-				target = fake2realpath(root_dir, target) #if (re.search("\.\." + os.sep, target)) else target # for symlink targets that include ../ in their path
-				is_dir = True if os.path.isdir(str(target)) else False
-				is_broken = True if (not os.path.exists(str(target)) or is_dir) else False
+
+		# Handle symlinks
+		for d in root_dirs:
+			if os.path.islink(f'{root_dir}{d}'):
+				symlinks.append(d)
+		
+		
+		# Process files
+		root_files.sort()
+		
+		if not args.directories_only:
+			
+			for i in range(0, total_files):
+				total_files_processed += 1
+				file_path = f'{root_dir}{root_files[i]}'
+				is_link = True if os.path.islink(file_path) else False
 				
-			else:
-				is_broken = None
-
-
-			# Submit file for content inspection if it's not a broken symlink
-			if (not is_link) or (is_link and not is_broken):
-				details = file_inspector(file_path) if not is_link else file_inspector(target)
-				
-				if isinstance(details, list):
-					color, verbose = details[0], details[1]
+				try:
+					is_char_special = True if S_ISCHR((os.lstat(file_path)[ST_MODE])) else False
+				except:
+					is_char_special = False
+				# ~ print(f'cs {is_char_special} {file_path}')
+				try:
+					is_block_special = True if S_ISBLK(os.stat(file_path)[ST_MODE]) else False
+				except:
+					is_block_special = False
+				# ~ print(f'bs {is_block_special} {file_path}')
+				# Verify target path if file is a symlink 			
+				if is_link:
+					symlink_target = target = os.readlink(file_path) if is_link else None
+					#target = (root_dir[0:-1] + target) if (re.search("\.\." + os.sep, target)) and (target.count(".." + os.sep) == (root_dir.count(os.sep) - 1)) else target # for symlink targets that include ../ in their path
+					target = fake2realpath(root_dir, target) #if (re.search("\.\." + os.sep, target)) else target # for symlink targets that include ../ in their path
+					is_dir = True if os.path.isdir(str(target)) else False
+					is_broken = True if (not os.path.exists(str(target)) or is_dir) else False
+					
+					try:
+						target_is_char_special = True if S_ISCHR((os.lstat(target)[ST_MODE])) else False
+					except:
+						target_is_char_special = False
+						
+					try:
+						target_is_block_special = True if S_ISBLK(os.stat(file_path).st_mode) else False
+					except:
+						target_is_block_special = False
+					
 				else:
-					color, verbose = details, ''
+					is_broken = None
+
+				# Submit file for content inspection if it's not a broken symlink
+				if (not is_link and not is_char_special and not is_block_special) or (is_link and not is_broken and not target_is_char_special and not target_is_block_special):
+					details = file_inspector(file_path) if not is_link else file_inspector(target)
+					
+					if isinstance(details, list):
+						color, verbose = details[0], details[1]
+					else:
+						color, verbose = details, ''
+				
+				else:
+					color, verbose = '', ''
+					
+				
+				# Color mark file accordingly in relation to the type and content inspection results
+				if is_link:				
+					linkcolor = BROKEN if is_broken else LINK
+					color = CHARSPEC if target_is_block_special or target_is_char_special else color
+					filename = f'{linkcolor}{root_files[i]}{END} -> {color}{symlink_target}' if not args.full_pathnames else f'{linkcolor}{root_dir}{root_files[i]}{END} -> {color}{symlink_target}'
+				
+				elif is_char_special or is_block_special:
+					filename = f'{CHARSPEC}{root_files[i]}' if not args.full_pathnames else f'{CHARSPEC}{root_dir}{root_files[i]}'
+					
+				else:
+					filename = f'{color}{root_files[i]}' if not args.full_pathnames else f'{color}{root_dir}{root_files[i]}'
+				
+				# Print file branch
+				if not args.only_interesting:
+					print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
+					
+				elif args.only_interesting and (color and color != RED):
+					print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
+
+
+		# Process dirs
+		root_dirs.sort()
+		
+		for i in range(0, total_dirs):
+			total_dirs_processed += 1
+			joined_path = root_dir + root_dirs[i]
+			is_recursive = False
+			directory = root_dirs[i] if not args.full_pathnames else (joined_path + os.sep)
 			
+			# Check if symlink and if target leads to recursion 
+			if root_dirs[i] in symlinks:
+				symlink_target = target = os.readlink(joined_path)
+				#target = (root_dir + target) if (re.search("\.\." + os.sep, target)) and (target.count(".." + os.sep) == (root_dir.count(os.sep) - 1)) else target # for symlink targets that include ../ in their path
+				target = fake2realpath(root_dir, target) #if (re.search("\.\." + os.sep, target)) else target # for symlink targets that include ../ in their path			
+				is_recursive = ' [recursive, not followed]' if target == root_dir[0:-1] else ''
+				
+				if len(is_recursive):
+					recursive.append(joined_path)
+					
+				print(f'{depth}{child}{LINK}{directory}{END} -> {DIR}{symlink_target}{END}{is_recursive}') if i < total_dirs - 1 else print(f'{depth}{child_last}{LINK}{directory}{END} -> {DIR}{symlink_target}{END}{is_recursive}')
+				
 			else:
-				color, verbose = '', ''
-				
+				print(f'{depth}{child}{DIR}{directory}{END}') if i < total_dirs - 1 else print(f'{depth}{child_last}{DIR}{directory}{END}')
 			
-			# Color mark file accordingly in relation to the content inspection results
-			if is_link:				
-				linkcolor = BROKEN if is_broken else LINK
-				filename = f'{linkcolor}{root_files[i]}{END} -> {color}{target}' if not args.full_pathnames else f'{linkcolor}{root_dir}{root_files[i]}{END} -> {color}{target}'
-				
-			else:
-				filename = f'{color}{root_files[i]}' if not args.full_pathnames else f'{color}{root_dir}{root_files[i]}'
+			sub_dirs = next(os.walk(joined_path))[1]
+			sub_files = next(os.walk(joined_path))[2]
 			
-			# Print file branch
-			if not args.only_interesting:
-				print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
+			if (not args.follow_links and root_dirs[i] not in symlinks) or (args.follow_links and not is_recursive):
+				if (len(sub_dirs) or len(sub_files)) and (intent + 1) < depth_level:
+					tmp = depth
+					depth = depth + parent if i < (total_dirs - 1) else depth + '    '
+					eviltree(joined_path + os.sep, intent + 1, depth)
+					depth = tmp
 				
-			elif args.only_interesting and (color and color != RED):
-				print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
-
-
-	# Process dirs
-	root_dirs.sort()
-	
-	for i in range(0, total_dirs):
-		total_dirs_processed += 1
-		joined_path = root_dir + root_dirs[i]
-		is_recursive = False
-		directory = root_dirs[i] if not args.full_pathnames else (joined_path + os.sep)
+	except StopIteration:
+		print(f'{RED}[X]{END} Permission denied')
+		# ~ pass
 		
-		# Check if symlink and if target leads to recursion 
-		if root_dirs[i] in symlinks:
-			target = os.readlink(joined_path)
-			#target = (root_dir + target) if (re.search("\.\." + os.sep, target)) and (target.count(".." + os.sep) == (root_dir.count(os.sep) - 1)) else target # for symlink targets that include ../ in their path
-			target = fake2realpath(root_dir, target) #if (re.search("\.\." + os.sep, target)) else target # for symlink targets that include ../ in their path			
-			is_recursive = ' [recursive, not followed]' if target == root_dir[0:-1] else ''
-			
-			if len(is_recursive):
-				recursive.append(joined_path)
-				
-			print(f'{depth}{child}{LINK}{directory}{END} -> {DIR}{target}{END}{is_recursive}') if i < total_dirs - 1 else print(f'{depth}{child_last}{LINK}{directory}{END} -> {DIR}{target}{END}{is_recursive}')
-			
-		else:
-			print(f'{depth}{child}{DIR}{directory}{END}') if i < total_dirs - 1 else print(f'{depth}{child_last}{DIR}{directory}{END}')
-		
-		sub_dirs = next(os.walk(joined_path))[1]
-		sub_files = next(os.walk(joined_path))[2]
-		
-		if (not args.follow_links and root_dirs[i] not in symlinks) or (args.follow_links and not is_recursive):
-			if (len(sub_dirs) or len(sub_files)) and (intent + 1) < depth_level:
-				tmp = depth
-				depth = depth + parent if i < (total_dirs - 1) else depth + '    '
-				eviltree(joined_path + os.sep, intent + 1, depth)
-				depth = tmp
-			
-
+	# ~ except:
+		# ~ pass
 	# ~ except Exception as e:
 		# ~ exit_with_msg(f'Something went wrong: {e}')
 
