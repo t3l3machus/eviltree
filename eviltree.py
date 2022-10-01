@@ -1,5 +1,5 @@
 #!/bin/python3
-#
+# -*- coding: utf-8 -*-
 # Written by Panagiotis Chartas (t3l3machus)
 
 import os, re, argparse
@@ -18,7 +18,7 @@ DIR = '\033[1;38;5;12m'
 MATCH = '\033[1;38;5;201m' #220
 RED = '\033[1;31m'
 END = '\033[0m'
-
+BOLD = '\033[1m'
 
 # -------------- Arguments & Usage -------------- #
 parser = argparse.ArgumentParser()
@@ -29,10 +29,10 @@ parser.add_argument("-k", "--keywords", action="store", help = "Comma separated 
 parser.add_argument("-a", "--match-all", action="store_true", help = "By default, files are marked when at least one keyword is matched. Use this option to mark only files that match all given keywords.")
 parser.add_argument("-L", "--level", action="store", help = "Descend only level directories deep.", type = int)
 parser.add_argument("-i", "--ignore-case", action="store_true", help = "Enables case insensitive keyword search ** for non-binary files only **.")
-parser.add_argument("-b", "--binary", action="store_true", help = "Search for keywords in binary files as well.")
+parser.add_argument("-b", "--binary", action="store_true", help = "Search for keywords in binary files too. Regex is compiled, only case sensitive search is supported.")
 parser.add_argument("-v", "--verbose", action="store_true", help = "Print information about which keyword(s) matched.")
 parser.add_argument("-f", "--full-pathnames", action="store_true", help = "Print absolute file and directory paths.")
-parser.add_argument("-n", "--non-ascii", action="store_true", help = "Draw the directories tree using utf-8 characters (use this in case of \"UnicodeEncodeError: 'ascii' codec...\" along with -q).")
+parser.add_argument("-n", "--non-ascii", action="store_true", help = "Draw the directories tree using common utf-8 characters (in case of \"UnicodeEncodeError: 'ascii' codec...\" along with -q).")
 parser.add_argument("-d", "--directories-only", action="store_true", help = "List directories only.")
 parser.add_argument("-l", "--follow-links", action="store_true", help = "Follows symbolic links if they point to directories, as if they were directories. Symbolic links that will result in recursion are avoided when detected.")
 parser.add_argument("-q", "--quiet", action="store_true", help = "Do not print the banner on startup.")
@@ -41,7 +41,7 @@ args = parser.parse_args()
 
 
 def exit_with_msg(msg):
-	print(f'[{DEBUG}Debug{END}] {msg}')
+	print(f'[{DEBUG}Debugger{END}] {msg}')
 	exit(1)
 	
 
@@ -196,16 +196,20 @@ def fake2realpath(root_dir, target):
 		except:
 			return None
 	
-	elif not re.search(os.sep, target): # there a case missing here --> testdir/
+	elif not re.search(os.sep, target): # there is a case missing here --> testdir/
 		return root_dir + target
 
 
 	elif re.search("\." + os.sep, target) and not re.search("\.\." + os.sep, target):
-		return root_dir + (target.replace("./", ""))
+		return root_dir + (target.replace("." + os.sep, ""))
 	
 	else:
 		return target
 
+
+
+def adjustUnicodeError():
+	exit_with_msg('The system seems to have an uncommon default encoding. Restart eviltree with options -q and -n to bypass this issue.')
 
 
 # ~ child = '├── ' if not args.non_ascii else '|-- '
@@ -231,13 +235,13 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 		print(f'\r{DIR}{root_dir}{END}') if not intent else chill()
 
 
-		# Handle symlinks
+		''' Handle symlinks '''
 		for d in root_dirs:
 			if os.path.islink(f'{root_dir}{d}'):
 				symlinks.append(d)
 		
 		
-		# Process files
+		''' Process files '''
 		root_files.sort()
 		
 		if not args.directories_only:
@@ -257,7 +261,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				except:
 					is_block_special = False
 				# ~ print(f'bs {is_block_special} {file_path}')
-				# Verify target path if file is a symlink 			
+				''' Verify target path if file is a symlink '''		
 				if is_link:
 					symlink_target = target = os.readlink(file_path) if is_link else None
 					#target = (root_dir[0:-1] + target) if (re.search("\.\." + os.sep, target)) and (target.count(".." + os.sep) == (root_dir.count(os.sep) - 1)) else target # for symlink targets that include ../ in their path
@@ -278,7 +282,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				else:
 					is_broken = None
 
-				# Submit file for content inspection if it's not a broken symlink / character special / block special
+				''' Submit file for content inspection if it's not a broken symlink / character special / block special '''
 				if (not is_link and not is_char_special and not is_block_special) or (is_link and not is_broken and not target_is_char_special and not target_is_block_special):
 					details = file_inspector(file_path) if not is_link else file_inspector(target)
 					
@@ -295,7 +299,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 					color, verbose, errormsg = '', '', ''
 					
 				
-				# Color mark file accordingly in relation to its type and content inspection results
+				''' Color mark file accordingly in relation to its type and content inspection results '''
 				if is_link:				
 					linkcolor = BROKEN if is_broken else LINK
 					color = CHARSPEC if target_is_block_special or target_is_char_special else color
@@ -307,15 +311,15 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				else:
 					filename = f'{color}{root_files[i]}' if not args.full_pathnames else f'{color}{root_dir}{root_files[i]}'
 				
-				# Print file branch
+				''' Print file branch '''
 				if not args.only_interesting:
 					print(f'{depth}{child}{color}{filename}{END}{verbose}{errormsg}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}{errormsg}')
 					
-				elif args.only_interesting and ((color and color != RED) and not errormsg):
+				elif args.only_interesting and ((color and color == MATCH) and not errormsg):
 					print(f'{depth}{child}{color}{filename}{END}{verbose}{errormsg}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}{errormsg}')
 
 
-		# Process dirs
+		''' Process dirs '''
 		root_dirs.sort()
 		
 		for i in range(0, total_dirs):
@@ -325,7 +329,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 			is_recursive = False
 			directory = root_dirs[i] if not args.full_pathnames else (joined_path + os.sep)
 			
-			# Access permissions check
+			''' Access permissions check '''
 			try:
 				sub_dirs = len(next(os.walk(joined_path))[1])
 				sub_files = len(next(os.walk(joined_path))[2])
@@ -337,7 +341,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 						
 				# ~ print(f'[error accessing dir]')
 			
-			# Check if symlink and if target leads to recursion 
+			''' Check if symlink and if target leads to recursion '''
 			if root_dirs[i] in symlinks:
 				symlink_target = target = os.readlink(joined_path)
 				#target = (root_dir + target) if (re.search("\.\." + os.sep, target)) and (target.count(".." + os.sep) == (root_dir.count(os.sep) - 1)) else target # for symlink targets that include ../ in their path
@@ -351,7 +355,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				
 			else:
 				print(f'{depth}{child}{DIR}{directory}{END}{errormsg}') if i < total_dirs - 1 else print(f'{depth}{child_last}{DIR}{directory}{END}{errormsg}')
-			
+			gfdgfd
 
 			
 			if (not args.follow_links and root_dirs[i] not in symlinks) or (args.follow_links and not is_recursive):
@@ -365,14 +369,22 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 	except StopIteration:
 		print(f'\r{DIR}{root_dir}{END} [error accessing dir]')
 		
+	except UnicodeEncodeError:
+		adjustUnicodeError()
+		
 	except Exception as e:
-		exit_with_msg(f'Something went wrong: {e}')
+		exit_with_msg(f'Something went wrong. Consider creating an issue about this in the original repo (https://github.com/t3l3machus/eviltree)\n{BOLD}Error Details{END}: {e}')
 
 
 
 def main():
+	
+	try:
+		print_banner() if not args.quiet else chill()
 		
-	print_banner() if not args.quiet else chill()
+	except UnicodeEncodeError:
+		adjustUnicodeError()
+	
 	root_dir = args.root_path if args.root_path[-1] == os.sep else args.root_path + os.sep	
 	
 	if os.path.exists(root_dir):
@@ -381,7 +393,7 @@ def main():
 		
 	else:
 		exit_with_msg('Directory does not exist.')
-		
+			
 
 
 if __name__ == '__main__':
