@@ -4,13 +4,14 @@
 
 import os, re, argparse
 from stat import S_ISCHR, ST_MODE, S_ISBLK
-from sys import exit
 
 
 ''' Colors '''
 LINK = '\033[1;38;5;37m'
 BROKEN = '\033[48;5;234m\033[1;31m'
 CHARSPEC = '\033[0;38;5;228m'
+#CHARSPEC = '\033[48;5;234m\033[1;33m'
+DENIED = '\033[38;5;222m'
 DEBUG = '\033[0;38;5;214m'
 GREEN = '\033[38;5;47m'
 DIR = '\033[1;38;5;12m'
@@ -28,6 +29,7 @@ parser.add_argument("-k", "--keywords", action="store", help = "Comma separated 
 parser.add_argument("-a", "--match-all", action="store_true", help = "By default, files are marked when at least one keyword is matched. Use this option to mark only files that match all given keywords.")
 parser.add_argument("-L", "--level", action="store", help = "Descend only level directories deep.", type = int)
 parser.add_argument("-i", "--ignore-case", action="store_true", help = "Enables case insensitive keyword search ** for non-binary files only **.")
+parser.add_argument("-b", "--binary", action="store_true", help = "Search for keywords in binary files as well.")
 parser.add_argument("-v", "--verbose", action="store_true", help = "Print information about which keyword(s) matched.")
 parser.add_argument("-f", "--full-pathnames", action="store_true", help = "Print absolute file and directory paths.")
 parser.add_argument("-n", "--non-ascii", action="store_true", help = "Draw the directories tree using utf-8 characters (use this in case of \"UnicodeEncodeError: 'ascii' codec...\" along with -q).")
@@ -63,7 +65,7 @@ total_keywords = len(keywords)
 
 # Define depth level
 if isinstance(args.level, int):
-	depth_level = args.level if (args.level > 0) else exit_with_msg('Level (-l) must be greater than 0.') 
+	depth_level = args.level if (args.level > 0) else exit_with_msg('Level (-L) must be greater than 0.') 
 
 else:
 	depth_level = 4096
@@ -72,7 +74,8 @@ else:
 # -------------- Functions -------------- #
 
 def print_banner():
-
+	
+	print('\r')
 	padding = '  '
 
 	E = [[' ', '┌', '─', '┐'], [' ', '├┤',' '], [' ', '└','─','┘']]
@@ -84,7 +87,6 @@ def print_banner():
 
 	banner = [E,V,I,L,T,R,E,E]
 	final = []
-	print('\r')
 	init_color = 43
 	txt_color = init_color
 	cl = 0
@@ -116,12 +118,7 @@ def chill():
 
 # regex = '[\s\S]{0,3}' + r + '[\s\S]{0,3}'		
 # re.search(regex, open('/opt/testlink.txt').read(), re.I)
-
-# ~ class SearchEngine:
 	
-	# ~ def __init__(self, mode):
-		# ~ self.mode = mode
-		
 	
 def file_inspector(file_path, mode = 0):
 	try:
@@ -138,6 +135,9 @@ def file_inspector(file_path, mode = 0):
 				content = _file.read()		
 				binary = True
 			
+			except PermissionError:
+				return 1
+				
 			except:
 				#print(f'{GREEN}failed to read{file_path}{END}')
 				return RED
@@ -149,11 +149,14 @@ def file_inspector(file_path, mode = 0):
 				#w = '[\s\S]{0,3}' + w + '[\s\S]{0,3}'
 				regex = re.compile(bytes(w.encode('utf-8'))) if binary else w
 				
-				if binary:
+				if binary and args.binary:
 					found = re.search(regex, content)
-				else:
+				elif not binary:
 					found = re.search(regex, content, re.I) if args.ignore_case else re.search(regex, content)
+				else:
+					found = False
 				
+
 				if found:
 					matched.append(w)
 					
@@ -205,9 +208,12 @@ def fake2realpath(root_dir, target):
 
 
 
-child = '├── ' if not args.non_ascii else '|-- '
-child_last = '└── ' if not args.non_ascii else '|-- '
-parent = '│   ' if not args.non_ascii else '|   '
+# ~ child = '├── ' if not args.non_ascii else '|-- '
+# ~ child_last = '└── ' if not args.non_ascii else '|-- '
+# ~ parent = '│   ' if not args.non_ascii else '|   '
+child = (chr(9500) + (chr(9472) * 2) + ' ') if not args.non_ascii else '|-- '
+child_last = (chr(9492) + (chr(9472) * 2) + ' ') if not args.non_ascii else '|-- '
+parent = (chr(9474) + '   ') if not args.non_ascii else '|   '
 total_dirs_processed = 0
 total_files_processed = 0
 
@@ -215,15 +221,14 @@ total_files_processed = 0
 def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 
 	try:
-		global total_dirs_processed, total_files_processed
-		
+		global total_dirs_processed, total_files_processed		
 		root_dirs = next(os.walk(root_dir))[1]
 		root_files = next(os.walk(root_dir))[2]
 		total_dirs = len(root_dirs)
 		total_files = len(root_files)
 		symlinks = []
 		recursive = []
-		
+		print(f'\r{DIR}{root_dir}{END}') if not intent else chill()
 
 
 		# Handle symlinks
@@ -273,24 +278,28 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				else:
 					is_broken = None
 
-				# Submit file for content inspection if it's not a broken symlink
+				# Submit file for content inspection if it's not a broken symlink / character special / block special
 				if (not is_link and not is_char_special and not is_block_special) or (is_link and not is_broken and not target_is_char_special and not target_is_block_special):
 					details = file_inspector(file_path) if not is_link else file_inspector(target)
 					
 					if isinstance(details, list):
-						color, verbose = details[0], details[1]
+						color, verbose, errormsg = details[0], details[1], ''
+					
+					elif details == 1:
+						color, verbose, errormsg = details, '', f' {DENIED}[permission denied]{END}'
+						
 					else:
-						color, verbose = details, ''
+						color, verbose, errormsg = details, '', ''
 				
 				else:
-					color, verbose = '', ''
+					color, verbose, errormsg = '', '', ''
 					
 				
-				# Color mark file accordingly in relation to the type and content inspection results
+				# Color mark file accordingly in relation to its type and content inspection results
 				if is_link:				
 					linkcolor = BROKEN if is_broken else LINK
 					color = CHARSPEC if target_is_block_special or target_is_char_special else color
-					filename = f'{linkcolor}{root_files[i]}{END} -> {color}{symlink_target}' if not args.full_pathnames else f'{linkcolor}{root_dir}{root_files[i]}{END} -> {color}{symlink_target}'
+					filename = f'{linkcolor}{root_files[i]}{END} -> {color}{symlink_target}{errormsg}' if not args.full_pathnames else f'{linkcolor}{root_dir}{root_files[i]}{END} -> {color}{symlink_target}{errormsg}'
 				
 				elif is_char_special or is_block_special:
 					filename = f'{CHARSPEC}{root_files[i]}' if not args.full_pathnames else f'{CHARSPEC}{root_dir}{root_files[i]}'
@@ -300,20 +309,33 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				
 				# Print file branch
 				if not args.only_interesting:
-					print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
+					print(f'{depth}{child}{color}{filename}{END}{verbose}{errormsg}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}{errormsg}')
 					
-				elif args.only_interesting and (color and color != RED):
-					print(f'{depth}{child}{color}{filename}{END}{verbose}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}')
+				elif args.only_interesting and ((color and color != RED) and not errormsg):
+					print(f'{depth}{child}{color}{filename}{END}{verbose}{errormsg}') if (i < (total_files + total_dirs) - 1) else print(f'{depth}{child_last}{color}{filename}{END}{verbose}{errormsg}')
 
 
 		# Process dirs
 		root_dirs.sort()
 		
 		for i in range(0, total_dirs):
+			
 			total_dirs_processed += 1
 			joined_path = root_dir + root_dirs[i]
 			is_recursive = False
 			directory = root_dirs[i] if not args.full_pathnames else (joined_path + os.sep)
+			
+			# Access permissions check
+			try:
+				sub_dirs = len(next(os.walk(joined_path))[1])
+				sub_files = len(next(os.walk(joined_path))[2])
+				errormsg = ''
+			
+			except StopIteration:
+				sub_dirs, sub_files = 0, 0
+				errormsg = f' [error accessing dir]'
+						
+				# ~ print(f'[error accessing dir]')
 			
 			# Check if symlink and if target leads to recursion 
 			if root_dirs[i] in symlinks:
@@ -325,29 +347,26 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				if len(is_recursive):
 					recursive.append(joined_path)
 					
-				print(f'{depth}{child}{LINK}{directory}{END} -> {DIR}{symlink_target}{END}{is_recursive}') if i < total_dirs - 1 else print(f'{depth}{child_last}{LINK}{directory}{END} -> {DIR}{symlink_target}{END}{is_recursive}')
+				print(f'{depth}{child}{LINK}{directory}{END} -> {DIR}{symlink_target}{END}{is_recursive}{errormsg}') if i < total_dirs - 1 else print(f'{depth}{child_last}{LINK}{directory}{END} -> {DIR}{symlink_target}{END}{is_recursive}{errormsg}')
 				
 			else:
-				print(f'{depth}{child}{DIR}{directory}{END}') if i < total_dirs - 1 else print(f'{depth}{child_last}{DIR}{directory}{END}')
+				print(f'{depth}{child}{DIR}{directory}{END}{errormsg}') if i < total_dirs - 1 else print(f'{depth}{child_last}{DIR}{directory}{END}{errormsg}')
 			
-			sub_dirs = next(os.walk(joined_path))[1]
-			sub_files = next(os.walk(joined_path))[2]
+
 			
 			if (not args.follow_links and root_dirs[i] not in symlinks) or (args.follow_links and not is_recursive):
-				if (len(sub_dirs) or len(sub_files)) and (intent + 1) < depth_level:
+				if (sub_dirs or sub_files) and (intent + 1) < depth_level:
 					tmp = depth
 					depth = depth + parent if i < (total_dirs - 1) else depth + '    '
 					eviltree(joined_path + os.sep, intent + 1, depth)
 					depth = tmp
-				
+			
+
 	except StopIteration:
-		print(f'{RED}[X]{END} Permission denied')
-		# ~ pass
+		print(f'\r{DIR}{root_dir}{END} [error accessing dir]')
 		
-	# ~ except:
-		# ~ pass
-	# ~ except Exception as e:
-		# ~ exit_with_msg(f'Something went wrong: {e}')
+	except Exception as e:
+		exit_with_msg(f'Something went wrong: {e}')
 
 
 
@@ -357,15 +376,12 @@ def main():
 	root_dir = args.root_path if args.root_path[-1] == os.sep else args.root_path + os.sep	
 	
 	if os.path.exists(root_dir):
-		print(f'\r{DIR}{root_dir}{END}')
 		eviltree(root_dir)
 		print(f'\n{total_dirs_processed} directories, {total_files_processed} files')
 		
 	else:
 		exit_with_msg('Directory does not exist.')
 		
-	print('\r')
-
 
 
 if __name__ == '__main__':
