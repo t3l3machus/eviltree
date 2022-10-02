@@ -5,10 +5,12 @@ A python3 remake of the classic "tree" command with the additional feature of se
 
 ## Installation & Usage Examples
 The script has no dependencies. Just `chmod +x` and run.  
-Here's an example of running a regex that would essentially match strings similar to `password = something`:
+**Example #1**: Here's an example of running a regex that would essentially match strings similar to `password = something`:
 
 ![image](https://user-images.githubusercontent.com/75489922/193478410-f69879a5-7c5c-4cd3-80f0-ece8f514e100.png)
-  
     
-An example of using comma separated keywords instead of regex:
+    
+    
+**Example #2**: Using comma separated keywords instead of regex:
+
 ![image](https://user-images.githubusercontent.com/75489922/193478656-a184ab55-0b3b-4f54-ada4-e658406503c1.png)
