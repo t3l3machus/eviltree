@@ -10,15 +10,18 @@ The script has no dependencies. Just `chmod +x` and run.
 ![image](https://user-images.githubusercontent.com/75489922/193536337-188b1f0d-46ad-4680-b068-a4f1772734da.png)
    
     
-    
 **Example #2**: Using comma separated keywords instead of regex:
 
 ![image](https://user-images.githubusercontent.com/75489922/193478656-a184ab55-0b3b-4f54-ada4-e658406503c1.png)  
   
 ## Further Options & Usage Tips
- - You can use this tool as the classic "tree" command if you do not provide keywords `-k` and regex `-x`. This is useful in case you have gained a shell and want to have "tree" with colored output to look around.
+ - You can use this tool as the classic "tree" command if you do not provide keywords `-k` and regex `-x` values. This is useful in case you have gained a limited shell on a machine and want to have "tree" with colored output to look around.
+ - Regex search `-x` actually returns all matched patterns in a file. Be careful when combining it with `-v`, if you don't limit the length of chars to match correctly you'll be flooded with matched ouput.
  - You can search keywords/regex in binary files as well by providing option `-b`.
  - You can control the directory traverse depth by providing the desired level with `-L`.
  - A quite useful feature is the `-i` (--interesting-only) option. It instructs eviltree to list only files with matching keywords/regex content, significantly reducing the output length:  
  ![image](https://user-images.githubusercontent.com/75489922/193540467-7fa13d73-0893-491f-9b1b-89b34cae8ad7.png)
 
+## Useful keywords/regex patterns
+ - Regex to look for passwords: `-x ".{0,3}passw.{0,3}[=]{1}.{0,18}"`
+ - Keywords to look for sensitive info: `-k passw,db_,admin,account,user,token`
