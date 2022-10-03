@@ -23,14 +23,15 @@ LINK = '\033[1;38;5;37m'
 BROKEN = '\033[48;5;234m\033[1;31m'
 CHARSPEC = '\033[0;38;5;228m'
 #CHARSPEC = '\033[48;5;234m\033[1;33m'
-PIPE = '\033[38;5;214m'
+#PIPE = '\033[38;5;214m'
+PIPE = '\033[48;5;234m\033[1;30m'
 SOCKET = '\033[1;38;5;98m'
 EXECUTABLE = '\033[1;38;5;43m'
 DENIED = '\033[38;5;222m'
 DEBUG = '\033[0;38;5;214m'
 GREEN = '\033[38;5;47m'
 DIR = '\033[1;38;5;12m'
-MATCH = '\033[1;38;5;201m' #220
+MATCH = '\033[1;38;5;201m'
 FAILED = '\033[1;31m'
 END = '\033[0m'
 BOLD = '\033[1m'
@@ -42,7 +43,7 @@ parser = argparse.ArgumentParser(
 	
 Usage tips:
 
-  - Regex -x search actually returns all matched patterns in a file. Be careful when combining it with -v (--verbose), if you don't limit the length of chars to match correctly, you'll be flooded with matched ouput.
+  - Regex -x search actually returns a unique list of all matched patterns in a file. Be careful when combining it with -v (--verbose), try to be specific and limit the length of chars to match.
   - You can use this tool as the classic "tree" command if you do not provide keywords -k and regex -x values. This is useful in case you have gained a limited shell on a machine and want to have "tree" with colored output to look around.
 
 Useful keywords/regex patterns:
@@ -54,7 +55,6 @@ Useful keywords/regex patterns:
 )
 
 parser.add_argument("-r", "--root-path", action="store", help = "The root path to walk.", required = True)
-parser.add_argument("-i", "--interesting-only", action="store_true", help = "List only files with matching keywords/regex content (significantly reduces output length).")
 parser.add_argument("-k", "--keywords", action="store", help = "Comma separated keywords to search for in files.")
 parser.add_argument("-x", "--regex", action="store", help = "Regex pattern to search for in files. In combination with --verbose, this option returns all values that matched the given pattern for each file, you should use it with caution while setting character limits before and after your actual pattern.")
 parser.add_argument("-a", "--match-all", action="store_true", help = "By default, files are highlighted when at least one keyword is matched. Use this option to highlight files that match all given keywords only. This option has no effect when used with regex.")
@@ -62,6 +62,7 @@ parser.add_argument("-L", "--level", action="store", help = "Descend only level 
 parser.add_argument("-c", "--case-sensitive", action="store_true", help = "Enables case sensitive keywords/regex search.")
 parser.add_argument("-b", "--binary", action="store_true", help = "Search for keywords/regex in binary files too.")
 parser.add_argument("-v", "--verbose", action="store_true", help = "Print information about which keyword(s) matched.")
+parser.add_argument("-i", "--interesting-only", action="store_true", help = "List only files with matching keywords/regex content (significantly reduces output length).")
 parser.add_argument("-f", "--full-pathnames", action="store_true", help = "Print absolute file and directory paths.")
 parser.add_argument("-A", "--ascii", action="store_true", help = "Use ASCII instead of extended characters (use this in case of \"UnicodeEncodeError: 'ascii' codec...\" along with -q).")
 parser.add_argument("-d", "--directories-only", action="store_true", help = "List directories only.")
@@ -109,7 +110,9 @@ else:
 
 process_files = True if (args.keywords or args.regex) else False
 print_fnames = True if not args.directories_only else False
-filetype_blacklist = ['gz']
+
+# Filetypes to avoid searching for keywords/regex:
+filetype_blacklist = ['gz', 'zip', 'tar', 'rar', '7z', 'bz2', 'xz', 'deb', 'img', 'iso', 'vmdk', 'dll', 'ovf', 'ova']
 
 # -------------- Functions -------------- #
 
@@ -177,7 +180,7 @@ def decoder(l):
 def file_inspector(file_path, mode = 0):
 	
 	try:
-		
+			
 		''' Load file content accordingly '''		
 		try:
 			content = load_file(file_path, 'r')
@@ -190,8 +193,12 @@ def file_inspector(file_path, mode = 0):
 		except PermissionError:
 			return 1
 
+		except MemoryError:
+			return 2
+
 		except KeyboardInterrupt:
-			exit_with_msg('Keyboard interrupt.')			
+			return 999
+			#exit_with_msg('Keyboard interrupt.')
 
 		except:
 			return FAILED
@@ -245,42 +252,26 @@ def file_inspector(file_path, mode = 0):
 			return MATCH if not args.verbose else [MATCH, " " + GREEN + "[" + ', '.join(matched) + "]" + END]
 
 		if args.regex:
+			
 			if not args.verbose and matched:
 				return MATCH
+				
 			elif args.verbose and matched:
-				return [MATCH, " " + GREEN + "[" + ', '.join(matched) + "]" + END]
+				unique = list(set(matched))
+				return [MATCH, " " + GREEN + "[" + ', '.join(unique) + "]" + END]
 		
-
 		return ''
-			
+		
 	except:
 		return FAILED		
 
 
 
-# ~ def get_last_symlink_target(path, target):
-	
-	# ~ # Get last target if symlink points to symlink etc
-	# ~ realpath_target = fake2realpath(path, target)
-	# ~ is_link = True if os.path.islink(realpath_target) else False
-	
-	# ~ if not is_link:
-		# ~ return realpath_target
-	
-	# ~ last_target = False
-	
-	# ~ while not last_target:
-		# ~ symlink_target = os.readlink(realpath_target)
-		# ~ realpath_target = get_last_symlink_target(path, target)
-		
-		
-
-
 def fake2realpath(path, target):
 	
 	sep_count = target.count(".." + os.sep)
-	regex_chk_1 = "^" + re.escape(".." + os.sep) # ../  OR  ..\
-	regex1_chk_2 = "^" + re.escape("." + os.sep) # ./   OR  .\
+	regex_chk_1 = "^" + re.escape(".." + os.sep)
+	regex1_chk_2 = "^" + re.escape("." + os.sep)
 	regex1_chk_3 = "^" + os.sep
 	
 	if (re.search(regex_chk_1, target)) and (sep_count <= (path.count(os.sep) - 1)):
@@ -382,10 +373,10 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 			else:
 				is_executable, is_socket, is_pipe, is_block_special, is_char_special = False, False, False, False, False
 
-			''' Ommit file if in blaacklisted types'''
 			
 			''' Verify target path if file is a symlink '''		
-			if is_link:							
+			if is_link:
+									
 				symlink_target = target = os.readlink(file_path) if is_link else None
 				target = fake2realpath(root_dir, target)
 				is_dir = True if os.path.isdir(str(target)) else False
@@ -426,7 +417,13 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 
 			''' Submit file for content inspection if it's not a broken symlink / character special / block special / pipe / socket'''
 			if process_files:
-				if (not is_link and not is_char_special and not is_block_special and not is_pipe and not is_socket) or (is_link and not is_broken and not target_is_char_special and not target_is_block_special and not target_is_pipe and not target_is_socket):
+				
+				# Check if file extension in blacklist
+				fname = root_files[i] if not is_link else target
+				file_ext = fname.rsplit(".", 1)[-1].lower()
+				blacklisted = True if file_ext in filetype_blacklist else False  
+				
+				if (not is_link and not is_char_special and not is_block_special and not is_pipe and not is_socket and not blacklisted) or (is_link and not is_broken and not target_is_char_special and not target_is_block_special and not target_is_pipe and not target_is_socket and not blacklisted):
 					details = file_inspector(file_path) if not is_link else file_inspector(target)
 					
 					if isinstance(details, list):
@@ -434,6 +431,12 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 					
 					elif details == 1:
 						color, verbose, errormsg = details, '', ' ' + DENIED + '[permission denied]' + END
+
+					elif details == 2:
+						color, verbose, errormsg = details, '', ' ' + DENIED + '[memory error]' + END
+					
+					elif details == 999:
+						exit_with_msg('Keyboard interrupt.')
 						
 					else:
 						color, verbose, errormsg = details, '', ''
@@ -447,6 +450,7 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 							
 			''' Color mark and print file accordingly in relation to its type and content inspection results '''
 			if print_fnames:
+
 				color = str(color)
 				
 				if is_link:				
@@ -469,10 +473,12 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 				elif is_executable:
 					if color not in [MATCH, FAILED]:
 						filename = (EXECUTABLE + root_files[i]) if not args.full_pathnames else (EXECUTABLE + root_dir + root_files[i])
-					
+					else:
+						filename = (color + root_files[i]) if not args.full_pathnames else (color + root_dir + root_files[i])
 				else:
+					
 					filename = (color + root_files[i]) if not args.full_pathnames else (color + root_dir + root_files[i])
-				
+
 				''' Print file branch '''
 				if not args.interesting_only:
 					print(depth + child + color + filename + END + verbose + errormsg) if (i < (total_files + total_dirs) - 1) else print(depth + child_last + color + filename + END + verbose + errormsg)
@@ -506,7 +512,6 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 			''' Check if symlink and if target leads to recursion '''
 			if root_dirs[i] in symlinks:
 				symlink_target = target = os.readlink(joined_path)
-				#target = (root_dir + target) if (re.search("\.\." + os.sep, target)) and (target.count(".." + os.sep) == (root_dir.count(os.sep) - 1)) else target # for symlink targets that include ../ in their path
 				target = fake2realpath(root_dir, target)			
 				is_recursive = ' [recursive, not followed]' if target == root_dir[0:-1] else ''
 				
