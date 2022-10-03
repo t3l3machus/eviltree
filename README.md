@@ -21,7 +21,7 @@ Notable features:
 - Regex `-x` search actually returns all matched patterns in a file. Be careful when combining it with `-v` (--verbose), if you don't limit the length of chars to match correctly, you'll be flooded with matched ouput.
  - You can search keywords/regex in binary files as well by providing option `-b`.
  - You can use this tool as the classic "tree" command if you do not provide keywords `-k` and regex `-x` values. This is useful in case you have gained a limited shell on a machine and want to have "tree" with colored output to look around.
- - There's a variable `filetype_blacklist` in the script which can be used to exclude certain file extensions from content search. By default, it excludes the most common compressed file data extensions ('gz', 'zip', 'tar', 'rar', '7z', 'bz2').
+ - There's a list variable `filetype_blacklist` in `eviltree.py` which can be used to exclude certain file extensions from content search. By default, it excludes the following: `gz, zip, tar, rar, 7z, bz2, xz, deb, img, iso, vmdk, dll, ovf, ova`.
  - A quite useful feature is the `-i` (--interesting-only) option. It instructs eviltree to list only files with matching keywords/regex content, significantly reducing the output length:  
  ![image](https://user-images.githubusercontent.com/75489922/193540467-7fa13d73-0893-491f-9b1b-89b34cae8ad7.png)
 
