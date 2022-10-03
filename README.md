@@ -18,7 +18,7 @@ The script has no dependencies. Just `chmod +x` and run.
 
 ## Further Options & Usage Tips
 Notable features:
-- Regex `-x` search actually returns all matched patterns in a file. Be careful when combining it with `-v` (--verbose), if you don't limit the length of chars to match correctly, you'll be flooded with matched ouput.
+- Regex `-x` search actually returns a unique list of all matched patterns in a file. Be careful when combining it with `-v` (--verbose), try to be specific and limit the length of chars to match.
  - You can search keywords/regex in binary files as well by providing option `-b`.
  - You can use this tool as the classic "tree" command if you do not provide keywords `-k` and regex `-x` values. This is useful in case you have gained a limited shell on a machine and want to have "tree" with colored output to look around.
  - There's a list variable `filetype_blacklist` in `eviltree.py` which can be used to exclude certain file extensions from content search. By default, it excludes the following: `gz, zip, tar, rar, 7z, bz2, xz, deb, img, iso, vmdk, dll, ovf, ova`.
