@@ -13,7 +13,8 @@ The script has no dependencies. Just `chmod +x` and run.
 **Example #2**: Using comma separated keywords instead of regex:
 
 ![image](https://user-images.githubusercontent.com/75489922/193478656-a184ab55-0b3b-4f54-ada4-e658406503c1.png)  
-  
+**Disclaimer**: Only tested on Windows 10 Pro.
+
 ## Further Options & Usage Tips
 Notable features:
 - Regex `-x` search actually returns all matched patterns in a file. Be careful when combining it with `-v` (--verbose), if you don't limit the length of chars to match correctly, you'll be flooded with matched ouput.
