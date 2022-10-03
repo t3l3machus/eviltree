@@ -5,7 +5,7 @@ A standalone python3 remake of the classic "tree" command with the additional fe
 
 ## Usage Examples
 
-**Example #1**: Running a regex that would essentially match strings similar to: `password = something`
+**Example #1**: Running a regex that essentially matches strings similar to: `password = something` against `/var/www`
 
 ![image](https://user-images.githubusercontent.com/75489922/193536337-188b1f0d-46ad-4680-b068-a4f1772734da.png)
    
