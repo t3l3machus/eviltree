@@ -272,7 +272,7 @@ def fake2realpath(path, target):
 	sep_count = target.count(".." + os.sep)
 	regex_chk_1 = "^" + re.escape(".." + os.sep)
 	regex1_chk_2 = "^" + re.escape("." + os.sep)
-	regex1_chk_3 = "^" + os.sep
+	regex1_chk_3 = "^" + re.escape(os.sep)
 	
 	if (re.search(regex_chk_1, target)) and (sep_count <= (path.count(os.sep) - 1)):
 		dirlist = [d for d in path.split(os.sep) if d.strip()]
