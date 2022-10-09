@@ -9,6 +9,13 @@ A standalone python3 remake of the classic "tree" command with the additional fe
  - While searching for secrets in files of nested directory structures, being able to visualize which files contain user provided keywords/regex patterns and where those files are located in the hierarchy of folders, provides a significant advantage. 
  - "tree" is an amazing tool for analyzing directory structures. It's really handy to have a standalone alternative of the command for post-exploitation enumeration as it is not pre-installed on every linux distro and is kind of limited on Windows (compared to the UNIX version). 
 
+If you like this tool, consider sharing it:
+
+<a href="https://twitter.com/intent/tweet?text=A%20standalone%20python3%20remake%20of%20the%20classic%20%22tree%22%20command%20with%20the%20additional%20feature%20of%20searching%20for%20user%20provided%20keywords%2Fregex%20in%20files%2C%20highlighting%20those%20that%20contain%20matches.&url=https://github.com/t3l3machus/eviltree&via=t3l3machus&hashtags=cybersecurity,pentesting,redteaming,hacking,github" target="_blank">
+  <img alt="Tweet" height="22px" src="https://img.shields.io/twitter/url/http/shields.io.svg?style=social">
+</a>
+
+
 ## Usage Examples
 
 **Example #1**: Running a regex that essentially matches strings similar to: `password = something` against `/var/www`
