@@ -45,4 +45,5 @@ Notable features:
 ```
 .\eviltree_x64.exe -r C:\xampp -k password,passwd,admin -i -v -q -A
 .\eviltree_x64.exe -r C:\xampp -x ".{0,3}passw.{0,3}[=]{1}.{0,18}" -i -v -q -A
+.\eviltree_x64.exe -r C:\xampp -x ".{0,3}passw.{0,3}[=]{1}.{0,18}" -i -v -q -A -f -L 3
 ```
