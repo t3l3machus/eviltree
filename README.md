@@ -40,3 +40,9 @@ Notable features:
 ## Useful keywords/regex patterns
  - Regex to look for passwords: `-x ".{0,3}passw.{0,3}[=]{1}.{0,18}"`
  - Keywords to look for sensitive info: `-k passw,db_,admin,account,user,token`
+
+## Quick commands
+```
+.\eviltree_x64.exe -r C:\xampp -k password,passwd,admin -i -v -q -A
+.\eviltree_x64.exe -r C:\xampp -x ".{0,3}passw.{0,3}[=]{1}.{0,18}" -i -v -q -A
+```
