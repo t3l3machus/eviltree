@@ -533,7 +533,8 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 			
 
 	except StopIteration:
-		print('\r' + DIR + root_dir + END + ' [error accessing dir]')
+		print('\r' + DIR + root_dir + END + ' [Permission Denied]')
+		#print('\r' + DIR + root_dir + END + ' [error accessing dir]')
 		
 	except UnicodeEncodeError:
 		adjustUnicodeError()
