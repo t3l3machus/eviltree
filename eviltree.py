@@ -22,8 +22,6 @@ os.system('') if WINDOWS else move_on
 LINK = '\033[1;38;5;37m'
 BROKEN = '\033[48;5;234m\033[1;31m'
 CHARSPEC = '\033[0;38;5;228m'
-#CHARSPEC = '\033[48;5;234m\033[1;33m'
-#PIPE = '\033[38;5;214m'
 PIPE = '\033[48;5;234m\033[1;30m'
 SOCKET = '\033[1;38;5;98m'
 EXECUTABLE = '\033[1;38;5;43m'
@@ -178,7 +176,7 @@ def decoder(l):
 	
 
 def file_inspector(file_path, mode = 0):
-	
+
 	try:
 			
 		''' Load file content accordingly '''		
@@ -300,6 +298,9 @@ def fake2realpath(path, target):
 		return str(Path(target).resolve())
 
 
+def clean_unicode(text):
+    return text.encode('utf-8', errors='ignore').decode('utf-8')
+
 
 def adjustUnicodeError():
 	exit_with_msg('The system seems to have an uncommon default encoding. Restart eviltree with options -q and -A to resolve this issue.')
@@ -309,7 +310,7 @@ def adjustUnicodeError():
 # ~ child_last = '└── ' if not args.ascii else '|-- '
 # ~ parent = '│   ' if not args.ascii else '|   '
 child = (chr(9500) + (chr(9472) * 2) + ' ') if not args.ascii else '|-- '
-child_last = (chr(9492) + (chr(9472) * 2) + ' ') if not args.ascii else '\-- '
+child_last = (chr(9492) + (chr(9472) * 2) + ' ') if not args.ascii else '\\-- '
 parent = (chr(9474) + '   ') if not args.ascii else '|   '
 total_dirs_processed = 0
 total_files_processed = 0
@@ -366,13 +367,17 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 					is_socket = False
 
 				try:
+					is_stream = True if os.stat(file_path).st_mode == 33024 else False
+				except:
+					is_stream = False
+
+				try:
 					is_executable = True if (os.access(file_path, os.X_OK) and not is_char_special and not is_block_special and not is_pipe and not is_socket) else False
 				except:
 					is_executable = False
 					
 			else:
-				is_executable, is_socket, is_pipe, is_block_special, is_char_special = False, False, False, False, False
-
+				is_executable, is_socket, is_pipe, is_block_special, is_char_special, is_stream = [False] * 6
 			
 			''' Verify target path if file is a symlink '''		
 			if is_link:
@@ -415,15 +420,15 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 			else:
 				is_broken = None
 
-			''' Submit file for content inspection if it's not a broken symlink / character special / block special / pipe / socket'''
+			''' Submit file for content inspection if it's not a broken symlink / character special / block special / pipe / socket / stream'''
 			if process_files:
 				
 				# Check if file extension in blacklist
 				fname = root_files[i] if not is_link else target
 				file_ext = fname.rsplit(".", 1)[-1].lower()
-				blacklisted = True if file_ext in filetype_blacklist else False  
+				blacklisted = True if file_ext in filetype_blacklist  else False  
 				
-				if (not is_link and not is_char_special and not is_block_special and not is_pipe and not is_socket and not blacklisted) or (is_link and not is_broken and not target_is_char_special and not target_is_block_special and not target_is_pipe and not target_is_socket and not blacklisted):
+				if (not is_link and not is_char_special and not is_block_special and not is_pipe and not is_socket and not is_stream and not blacklisted) or (is_link and not is_broken and not target_is_char_special and not target_is_block_special and not target_is_pipe and not target_is_socket and not blacklisted):
 					details = file_inspector(file_path) if not is_link else file_inspector(target)
 					
 					if isinstance(details, list):
@@ -480,14 +485,12 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 					filename = (color + root_files[i]) if not args.full_pathnames else (color + root_dir + root_files[i])
 
 				''' Print file branch '''
-				if not args.interesting_only:
-					print(depth + child + color + filename + END + verbose + errormsg) if (i < (total_files + total_dirs) - 1) else print(depth + child_last + color + filename + END + verbose + errormsg)
+				if (not args.interesting_only) or args.interesting_only and ((color and color == MATCH) and not errormsg):
+					try:
+						print(depth + child + color + filename + END + verbose + errormsg) if (i < (total_files + total_dirs) - 1) else print(depth + child_last + color + filename + END + verbose + errormsg)
+					except UnicodeEncodeError:
+						print(clean_unicode(depth + child + color + filename + END + verbose + errormsg) if (i < (total_files + total_dirs) - 1) else print(depth + child_last + color + filename + END + verbose + errormsg))
 					
-				elif args.interesting_only and ((color and color == MATCH) and not errormsg):
-					print(depth + child + color + filename + END + verbose + errormsg) if (i < (total_files + total_dirs) - 1) else print(depth + child_last + color + filename + END + verbose + errormsg)
-
-
-
 		''' Process dirs '''
 		root_dirs.sort()
 		
@@ -534,7 +537,6 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 
 	except StopIteration:
 		print('\r' + DIR + root_dir + END + ' [Permission Denied]')
-		#print('\r' + DIR + root_dir + END + ' [error accessing dir]')
 		
 	except UnicodeEncodeError:
 		adjustUnicodeError()
@@ -544,7 +546,10 @@ def eviltree(root_dir, intent = 0, depth = '', depth_level = depth_level):
 
 	except PermissionError:
 		print('\r' + DIR + root_dir + END + ' [Permission Denied]')
-	
+
+	except FileNotFoundError:
+		print('\r' + DIR + root_dir + END + ' [Disappeared]')
+
 	except Exception as e:
 		exit_with_msg('Something went wrong. Consider creating an issue about this in the original repo (https://github.com/t3l3machus/eviltree)\n' + BOLD + 'Error Details' + END +': ' + str(e))
 
@@ -567,7 +572,6 @@ def main():
 	else:
 		exit_with_msg('Directory does not exist.')
 			
-
 
 if __name__ == '__main__':
 	main()
